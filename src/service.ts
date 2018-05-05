@@ -1,5 +1,6 @@
 import { Api } from '@geeebe/api';
-import { logger, Statuses } from '@geeebe/common';
+import { Statuses } from '@geeebe/common';
+import { logger } from '@geeebe/logging';
 import Validator from 'better-validator';
 import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
 import * as Koa from 'koa';
