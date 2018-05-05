@@ -1,0 +1,40 @@
+{
+  "name": "geeebe-service",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./dist/index.js",
+  "scripts": {
+    "test": "npx jest --coverage",
+    "build": "rm -rf dist && npx tsc --outDir dist --declaration --sourceMap",
+    "prepublishOnly": "npm run build && npm version patch"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@geeebe/api": "^1.0.15",
+    "@geeebe/common": "^1.0.17",
+    "better-validator": "^2.1.7",
+    "koa": "^2.5.1",
+    "koa-bodyparser": "^4.2.0",
+    "koa-compress": "^3.0.0",
+    "koa-conditional-get": "^2.0.0",
+    "koa-etag": "^3.0.0",
+    "koa-logger": "^3.2.0",
+    "koa-router": "^7.4.0",
+    "koa-static": "^4.0.2",
+    "reflect-metadata": "^0.1.12",
+    "underscore": "^1.9.0"
+  },
+  "types": "./dist/index.d.ts",
+  "devDependencies": {
+    "@types/jest": "^22.2.3",
+    "@types/koa": "^2.0.45",
+    "@types/koa-router": "^7.0.28",
+    "@types/mongoose": "^5.0.11",
+    "@types/node": "^8.10.12",
+    "@types/underscore": "^1.8.8",
+    "jest": "^22.4.3",
+    "tslint": "^5.10.0",
+    "typescript": "^2.8.3"
+  }
+}
