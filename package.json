@@ -5,15 +5,16 @@
   "main": "./dist/index.js",
   "scripts": {
     "test": "npx jest --coverage",
-    "build": "rm -rf dist && npx tsc --outDir dist --declaration --sourceMap",
+    "build": "rm -rf dist && npx tsc --outDir dist --sourceMap",
     "prepublishOnly": "npm run build && npm version patch"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@geeebe/api": "^1.0.15",
-    "@geeebe/common": "^1.0.17",
-    "@geeebe/logging": "^1.0.2",
+    "@geeebe/api": "^1.0.18",
+    "@geeebe/common": "^1.0.20",
+    "@geeebe/data": "^1.0.4",
+    "@geeebe/logging": "^1.0.5",
     "better-validator": "^2.1.7",
     "koa": "^2.5.1",
     "koa-bodyparser": "^4.2.0",
@@ -26,7 +27,7 @@
     "reflect-metadata": "^0.1.12",
     "underscore": "^1.9.0"
   },
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "devDependencies": {
     "@types/jest": "^22.2.3",
     "@types/koa": "^2.0.45",
