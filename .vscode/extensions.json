@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "steoates.autoimport",
+    "editorconfig.editorconfig",
+    "christian-kohler.path-intellisense",
+    "eg2.tslint",
+    "patrys.vscode-code-outline",
+    "waderyan.gitblame",
+    "codezombiech.gitignore"
+  ]
+}
