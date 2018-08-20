@@ -1,5 +1,7 @@
 {
   "eslint.enable": false,
   "editor.formatOnSave": true,
-  "tslint.autoFixOnSave": true
+  "tslint.autoFixOnSave": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true
 }
