@@ -13,7 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@geeebe/api": "^1.0.26",
+    "@geeebe/api": "^1.0.29",
     "@geeebe/common": "^1.0.40",
     "@geeebe/logging": "^1.0.7",
     "better-validator": "^2.1.7",
