@@ -26,11 +26,22 @@ export interface IService {
   start(): void;
 }
 
+export interface IInstrumentationDetails {
+  duration: number;
+  method: string;
+  path: string;
+  route: string;
+  status: number;
+}
+
+export type Instrumentation = (details: IInstrumentationDetails) => void;
+
 export interface IServiceOptions {
   port: number | string; // server port
   staticPath?: string; // directory from which to serve static files
   useLogger?: boolean; // include koa logger
   disableCache?: boolean;
+  instrumentation: Instrumentation;
 }
 
 const WrapperFormatter = Validator.format.response.WrapperFormatter;
@@ -79,7 +90,7 @@ export abstract class KoaService<TOptions extends IServiceOptions> extends Koa i
       this.use(koaLogger());
     }
 
-    // TODO this.use(Shared.instance.stats.monitorMiddleware());
+    this.use(this.instrumentationMiddleware());
     this.use(KoaService.errorMiddleware());
     this.use(this.securityHeaderMiddleware());
     this.use(conditional());
@@ -109,26 +120,48 @@ export abstract class KoaService<TOptions extends IServiceOptions> extends Koa i
     this.startServer();
   }
 
+  protected instrumentationMiddleware(): Middleware {
+    const middleware = async (ctx: Router.IRouterContext, next: () => Promise<any>): Promise<void> => {
+      const started = Date.now();
+
+      await next();
+
+      const duration = Date.now() - started;
+      if (!this.options.instrumentation) return;
+      try {
+        await this.options.instrumentation({
+          duration,
+          method: ctx.method,
+          path: ctx.path,
+          route: (ctx as any)._matchedRoute,
+          status: ctx.status,
+        });
+      } catch (err) {
+        log.error(err);
+      }
+    };
+    return middleware.bind(this);
+  }
+
   /**
    * Adds headers for additional security
    */
   protected securityHeaderMiddleware(): Middleware {
-    const middleware = (ctx: Router.IRouterContext, next: () => Promise<any>): Promise<void> => {
-      return next()
-        .then(() => {
-          ctx.set('X-Frame-Options', 'DENY');
-          ctx.set('X-XSS-Protection', '1; mode=block');
-          ctx.set('X-Content-Type-Options', 'nosniff');
+    const middleware = async (ctx: Router.IRouterContext, next: () => Promise<any>): Promise<void> => {
+      await next();
 
-          const cacheablePath = /\/(node_modules|scripts)\//.test(ctx.path);
-          const cacheableExtension = ctx.path.endsWith('.js') || ctx.path.endsWith('.css') || ctx.path.endsWith('.html');
-          if (!this.options.disableCache && cacheablePath && cacheableExtension) {
-            ctx.set('Cache-Control', 'max-age=3600');
-          } else {
-            ctx.set('Cache-Control', 'max-age=0');
-            ctx.set('Pragma', 'no-cache');
-          }
-        });
+      ctx.set('X-Frame-Options', 'DENY');
+      ctx.set('X-XSS-Protection', '1; mode=block');
+      ctx.set('X-Content-Type-Options', 'nosniff');
+
+      const cacheablePath = /\/(node_modules|scripts)\//.test(ctx.path);
+      const cacheableExtension = ctx.path.endsWith('.js') || ctx.path.endsWith('.css') || ctx.path.endsWith('.html');
+      if (!this.options.disableCache && cacheablePath && cacheableExtension) {
+        ctx.set('Cache-Control', 'max-age=3600');
+      } else {
+        ctx.set('Cache-Control', 'max-age=0');
+        ctx.set('Pragma', 'no-cache');
+      }
     };
     return middleware.bind(this);
   }
