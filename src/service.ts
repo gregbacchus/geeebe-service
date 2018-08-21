@@ -5,15 +5,12 @@ import Validator from 'better-validator';
 import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
 import * as Koa from 'koa';
 import { Middleware } from 'koa';
-import 'reflect-metadata';
-
 import Router = require('koa-router');
-import _ = require('underscore');
+import 'reflect-metadata';
 
 const bodyParser = require('koa-bodyparser');
 const compress = require('koa-compress');
 const conditional = require('koa-conditional-get');
-const debug = logger.child({ module: 'common:service' });
 const etag = require('koa-etag');
 const koaLogger = require('koa-logger');
 const serveStatic = require('koa-static');
@@ -23,11 +20,13 @@ const DEFAULT_OPTIONS = {
   port: 80,
 };
 
-export declare interface IService {
+const log = logger.child({ module: 'common:service' });
+
+export interface IService {
   start(): void;
 }
 
-export declare interface IServiceOptions {
+export interface IServiceOptions {
   port: number | string; // server port
   staticPath?: string; // directory from which to serve static files
   useLogger?: boolean; // include koa logger
@@ -69,10 +68,10 @@ export abstract class KoaService<TOptions extends IServiceOptions> extends Koa i
    * Create Koa app
    * @param options
    */
-  constructor(options: IServiceOptions) {
+  constructor(options: TOptions) {
     super();
 
-    this.options = _.defaults({}, options, DEFAULT_OPTIONS);
+    this.options = Object.assign({}, DEFAULT_OPTIONS, options);
 
     // use a real logger in production
     // hide the logger during tests because it's annoying
@@ -87,7 +86,7 @@ export abstract class KoaService<TOptions extends IServiceOptions> extends Koa i
     this.use(etag());
     this.use(compress());
     if (this.options.staticPath) {
-      debug(`Serving static content from ${this.options.staticPath}`);
+      log(`Serving static content from ${this.options.staticPath}`);
       this.use(serveStatic(this.options.staticPath));
     }
     this.use(bodyParser());
@@ -144,7 +143,7 @@ export abstract class KoaService<TOptions extends IServiceOptions> extends Koa i
    */
   protected startServer(): void {
     this.listen(this.options.port, () => {
-      debug(`HTTP started on http://localhost:${this.options.port}/`);
+      log(`HTTP started on http://localhost:${this.options.port}/`);
     });
   }
 
@@ -152,7 +151,7 @@ export abstract class KoaService<TOptions extends IServiceOptions> extends Koa i
    * Handle Koa app errors
    */
   private onError(error: any): void | never {
-    debug.error(error);
+    log.error(error);
     if (error.syscall !== 'listen') {
       throw error;
     }
