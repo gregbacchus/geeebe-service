@@ -48,7 +48,7 @@ export abstract class KoaService<TOptions extends IServiceOptions> extends Koa i
    * Returns error formatting middleware
    */
   private static errorMiddleware(): Middleware {
-    return async (ctx, next) => {
+    return async (ctx: Router.IRouterContext, next) => {
       try {
         await next();
 
