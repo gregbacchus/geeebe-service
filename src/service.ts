@@ -26,7 +26,7 @@ export interface IService {
   start(): void;
 }
 
-export interface IInstrumentationDetails {
+export interface IMonitorRequest {
   duration: number;
   method: string;
   path: string;
@@ -34,14 +34,14 @@ export interface IInstrumentationDetails {
   status: number;
 }
 
-export type Instrumentation = (details: IInstrumentationDetails) => void;
+export type Monitor = (details: IMonitorRequest) => void;
 
 export interface IServiceOptions {
   port: number | string; // server port
   staticPath?: string; // directory from which to serve static files
   useLogger?: boolean; // include koa logger
   disableCache?: boolean;
-  instrumentation?: Instrumentation;
+  monitor?: Monitor;
 }
 
 const WrapperFormatter = Validator.format.response.WrapperFormatter;
@@ -90,7 +90,7 @@ export abstract class KoaService<TOptions extends IServiceOptions> extends Koa i
       this.use(koaLogger());
     }
 
-    this.use(this.instrumentationMiddleware());
+    this.use(this.monitorMiddleware());
     this.use(KoaService.errorMiddleware());
     this.use(this.securityHeaderMiddleware());
     this.use(conditional());
@@ -120,16 +120,16 @@ export abstract class KoaService<TOptions extends IServiceOptions> extends Koa i
     this.startServer();
   }
 
-  protected instrumentationMiddleware(): Middleware {
+  protected monitorMiddleware(): Middleware {
     const middleware = async (ctx: Router.IRouterContext, next: () => Promise<any>): Promise<void> => {
       const started = Date.now();
 
       await next();
 
       const duration = Date.now() - started;
-      if (!this.options.instrumentation) return;
+      if (!this.options.monitor) return;
       try {
-        await this.options.instrumentation({
+        await this.options.monitor({
           duration,
           method: ctx.method,
           path: ctx.path,
