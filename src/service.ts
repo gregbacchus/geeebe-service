@@ -41,7 +41,7 @@ export interface IServiceOptions {
   staticPath?: string; // directory from which to serve static files
   useLogger?: boolean; // include koa logger
   disableCache?: boolean;
-  instrumentation: Instrumentation;
+  instrumentation?: Instrumentation;
 }
 
 const WrapperFormatter = Validator.format.response.WrapperFormatter;
