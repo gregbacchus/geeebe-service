@@ -22,11 +22,11 @@ const DEFAULT_OPTIONS = {
 
 const log = logger.child({ module: 'common:service' });
 
-export interface IService {
+export interface Service {
   start(): void;
 }
 
-export interface IMonitorRequest {
+export interface MonitorRequest {
   duration: number;
   method: string;
   path: string;
@@ -34,9 +34,9 @@ export interface IMonitorRequest {
   status: number;
 }
 
-export type Monitor = (details: IMonitorRequest) => void;
+export type Monitor = (details: MonitorRequest) => void;
 
-export interface IServiceOptions {
+export interface ServiceOptions {
   port: number | string; // server port
   staticPath?: string; // directory from which to serve static files
   useLogger?: boolean; // include koa logger
@@ -53,7 +53,7 @@ export const validatorMiddleware: Koa2Middleware = Validator.koa2Middleware({
 });
 
 //noinspection JSUnusedGlobalSymbols
-export abstract class KoaService<TOptions extends IServiceOptions> extends Koa implements IService {
+export abstract class KoaService<TOptions extends ServiceOptions> extends Koa implements Service {
 
   /**
    * Returns error formatting middleware

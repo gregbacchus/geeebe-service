@@ -39,7 +39,11 @@
         "check-format",
         "allow-leading-underscore"
       ]
-    }
+    },
+    "interface-name": [
+      true,
+      "never-prefix"
+    ]
   },
   "rulesDirectory": [],
   "linterOptions": {
