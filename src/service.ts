@@ -146,11 +146,13 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
 
       const duration = Date.now() - started;
       try {
-        responseSummary.observe({
-          method: ctx.method,
-          route: (ctx as any)._matchedRoute,
-          status: String(ctx.status),
-        }, duration);
+        if (ctx.path !== '/metrics') {
+          responseSummary.observe({
+            method: ctx.method,
+            route: (ctx as any)._matchedRoute,
+            status: String(ctx.status),
+          }, duration);
+        }
 
         if (!this.options.monitor) return;
         await this.options.monitor({
