@@ -6,6 +6,7 @@ import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
 import * as Koa from 'koa';
 import { Middleware } from 'koa';
 import Router = require('koa-router');
+import { collectDefaultMetrics, register, Summary } from 'prom-client';
 import 'reflect-metadata';
 
 const bodyParser = require('koa-bodyparser');
@@ -21,6 +22,14 @@ const DEFAULT_OPTIONS = {
 };
 
 const log = logger.child({ module: 'common:service' });
+
+collectDefaultMetrics();
+
+const responseSummary = new Summary({
+  help: 'Response timing',
+  labelNames: ['method', 'route', 'status'],
+  name: 'response',
+});
 
 export interface Service {
   start(): void;
@@ -73,6 +82,14 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
     };
   }
 
+  /**
+   * Renders monitoring metrics for Prometheus
+   */
+  private static async prometheusMetricsEndpoint(ctx: Router.IRouterContext): Promise<void> {
+    ctx.type = register.contentType;
+    ctx.body = register.metrics();
+  }
+
   public readonly options: TOptions;
 
   /**
@@ -111,6 +128,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
    */
   public start(): void {
     const router = new Router();
+    router.get('/metrics', KoaService.prometheusMetricsEndpoint);
     this.mountApi(router);
 
     this.use(router.routes());
@@ -127,8 +145,14 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
       await next();
 
       const duration = Date.now() - started;
-      if (!this.options.monitor) return;
       try {
+        responseSummary.observe({
+          method: ctx.method,
+          route: (ctx as any)._matchedRoute,
+          status: String(ctx.status),
+        }, duration);
+
+        if (!this.options.monitor) return;
         await this.options.monitor({
           duration,
           method: ctx.method,
