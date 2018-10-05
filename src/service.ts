@@ -51,6 +51,9 @@ export interface ServiceOptions {
   useLogger?: boolean; // include koa logger
   disableCache?: boolean;
   monitor?: Monitor;
+  isAlive?: () => Promise<boolean>;
+  isReady?: () => Promise<boolean>;
+  omitMonitoringEndpoints?: boolean;
 }
 
 const WrapperFormatter = Validator.format.response.WrapperFormatter;
@@ -128,7 +131,11 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
    */
   public start(): void {
     const router = new Router();
-    router.get('/metrics', KoaService.prometheusMetricsEndpoint);
+    if (!this.options.omitMonitoringEndpoints) {
+      router.get('/alive', this.livenessEndpoint());
+      router.get('/metrics', KoaService.prometheusMetricsEndpoint);
+      router.get('/ready', this.readinessEndpoint());
+    }
     this.mountApi(router);
 
     this.use(router.routes());
@@ -232,5 +239,39 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
       default:
         throw error;
     }
+  }
+
+  private livenessEndpoint() {
+    const endpoint = async (ctx: Router.IRouterContext): Promise<void> => {
+      let alive;
+      try {
+        alive = this.options.isAlive ? await this.options.isAlive() : true;
+      } catch (err) {
+        alive = false;
+      }
+      ctx.body = { alive };
+      if (alive) {
+        ctx.status = Statuses.SERVICE_UNAVAILABLE;
+        ctx.response.headers['Retry-After'] = 30;
+      }
+    };
+    return endpoint.bind(this);
+  }
+
+  private readinessEndpoint() {
+    const endpoint = async (ctx: Router.IRouterContext): Promise<void> => {
+      let ready;
+      try {
+        ready = this.options.isReady ? await this.options.isReady() : true;
+      } catch (err) {
+        ready = false;
+      }
+      ctx.body = { ready };
+      if (ready) {
+        ctx.status = Statuses.SERVICE_UNAVAILABLE;
+        ctx.response.headers['Retry-After'] = 30;
+      }
+    };
+    return endpoint.bind(this);
   }
 }
