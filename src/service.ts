@@ -153,7 +153,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
 
       const duration = Date.now() - started;
       try {
-        if (ctx.path !== '/metrics') {
+        if (['/alive', '/metrics', '/ready'].includes(ctx.path)) {
           responseSummary.observe({
             method: ctx.method,
             route: (ctx as any)._matchedRoute,

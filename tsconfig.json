@@ -5,8 +5,9 @@
     "experimentalDecorators": true,
     "inlineSources": true,
     "lib": [
-      "es2015",
       "dom",
+      "es2015",
+      "es7",
       "esnext.asynciterable"
     ],
     "module": "commonjs",
