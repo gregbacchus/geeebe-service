@@ -64,6 +64,17 @@ export const validatorMiddleware: Koa2Middleware = Validator.koa2Middleware({
   responseFormatter: new WrapperFormatter({}),
 });
 
+function ignorePaths(paths: string[], middleware: Middleware): Middleware {
+  return async function(ctx: Router.IRouterContext, next) {
+    if (paths.includes(ctx.path)) {
+      await next();
+    } else {
+      // must .call() to explicitly set the receiver
+      await middleware.call(this, ctx, next);
+    }
+  };
+}
+
 //noinspection JSUnusedGlobalSymbols
 export abstract class KoaService<TOptions extends ServiceOptions> extends Koa implements Service {
 
@@ -107,7 +118,14 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
     // use a real logger in production
     // hide the logger during tests because it's annoying
     if (this.env !== 'production' && this.env !== 'test' && this.options.useLogger !== false) {
-      this.use(koaLogger());
+      if (this.options.omitMonitoringEndpoints) {
+        this.use(koaLogger());
+      } else {
+        this.use(ignorePaths(
+          ['/alive', '/metrics', '/ready'],
+          koaLogger(),
+        ));
+      }
     }
 
     this.use(this.monitorMiddleware());
