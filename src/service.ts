@@ -25,6 +25,8 @@ const log = logger.child({ module: 'common:service' });
 
 collectDefaultMetrics();
 
+const MONITORING_ENDPOINTS = ['/alive', '/metrics', '/ready'];
+
 const responseSummary = new Summary({
   help: 'Response timing',
   labelNames: ['method', 'route', 'status'],
@@ -122,13 +124,16 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
         this.use(koaLogger());
       } else {
         this.use(ignorePaths(
-          ['/alive', '/metrics', '/ready'],
+          MONITORING_ENDPOINTS,
           koaLogger(),
         ));
       }
     }
 
-    this.use(this.monitorMiddleware());
+    this.use(ignorePaths(
+      MONITORING_ENDPOINTS,
+      this.monitorMiddleware(),
+    ));
     this.use(KoaService.errorMiddleware());
     this.use(this.securityHeaderMiddleware());
     this.use(conditional());
@@ -171,13 +176,11 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
 
       const duration = Date.now() - started;
       try {
-        if (!['/alive', '/metrics', '/ready'].includes(ctx.path)) {
-          responseSummary.observe({
-            method: ctx.method,
-            route: (ctx as any)._matchedRoute,
-            status: String(ctx.status),
-          }, duration);
-        }
+        responseSummary.observe({
+          method: ctx.method,
+          route: (ctx as any)._matchedRoute,
+          status: String(ctx.status),
+        }, duration);
 
         if (!this.options.monitor) return;
         await this.options.monitor({
