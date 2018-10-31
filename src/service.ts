@@ -239,11 +239,8 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
    */
   private onError(error: any): void | never {
     log.error(error);
-    if (error.code && typeof error.code === 'string' && error.code.startsWith('HPE_')) {
-      return;
-    }
     if (error.syscall !== 'listen') {
-      throw error;
+      return;
     }
 
     const bind = typeof this.options.port === 'string'
