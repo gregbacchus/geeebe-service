@@ -271,7 +271,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
         alive = false;
       }
       ctx.body = { alive };
-      if (alive) {
+      if (!alive) {
         ctx.status = Statuses.SERVICE_UNAVAILABLE;
         ctx.response.headers['Retry-After'] = 30;
       }
@@ -288,7 +288,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
         ready = false;
       }
       ctx.body = { ready };
-      if (ready) {
+      if (!ready) {
         ctx.status = Statuses.SERVICE_UNAVAILABLE;
         ctx.response.headers['Retry-After'] = 30;
       }
