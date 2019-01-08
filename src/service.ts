@@ -21,7 +21,7 @@ const DEFAULT_OPTIONS = {
   port: 80,
 };
 
-const log = logger.child({ module: 'common:service' });
+const log = logger.child({ module: 'service' });
 
 collectDefaultMetrics();
 
