@@ -23,7 +23,9 @@ const DEFAULT_OPTIONS = {
 
 const log = logger.child({ module: 'service' });
 
-collectDefaultMetrics();
+if (process.env.JEST_WORKER_ID === undefined) {
+  collectDefaultMetrics();
+}
 
 const MONITORING_ENDPOINTS = ['/alive', '/metrics', '/ready'];
 
