@@ -5,7 +5,8 @@ import Validator from 'better-validator';
 import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
 import * as Koa from 'koa';
 import { Middleware } from 'koa';
-import Router = require('koa-router');
+import * as Router from 'koa-router';
+import { Server } from 'net';
 import { collectDefaultMetrics, register, Summary } from 'prom-client';
 import 'reflect-metadata';
 
@@ -37,6 +38,7 @@ const responseSummary = new Summary({
 
 export interface Service {
   start(): void;
+  stop(): void;
 }
 
 export interface MonitorRequest {
@@ -110,6 +112,8 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
 
   public readonly options: TOptions;
 
+  private server: Server | undefined;
+
   /**
    * Create Koa app
    * @param options
@@ -155,6 +159,8 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
    * Start the app
    */
   public start(): void {
+    if (this.server) throw new Error('Already started');
+
     const router = new Router();
     if (!this.options.omitMonitoringEndpoints) {
       router.get('/alive', this.livenessEndpoint());
@@ -168,6 +174,12 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
 
     // start server
     this.startServer();
+  }
+
+  public stop() {
+    if (!this.server) return;
+    this.server.close();
+    this.server = undefined;
   }
 
   protected monitorMiddleware(): Middleware {
@@ -231,7 +243,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
    * Start the web server
    */
   protected startServer(): void {
-    this.listen(this.options.port, () => {
+    this.server = this.listen(this.options.port, () => {
       log(`HTTP started on http://localhost:${this.options.port}/`);
     });
   }
