@@ -1,12 +1,15 @@
 import { Api } from '@geeebe/api';
 import { Statuses } from '@geeebe/common';
-import { logger } from '@geeebe/logging';
+import { logger, Logger, WithLogger } from '@geeebe/logging';
 import Validator from 'better-validator';
 import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
 import * as Koa from 'koa';
 import { Middleware } from 'koa';
+import * as koaOpentracing from 'koa-opentracing';
 import * as Router from 'koa-router';
+import { RouterContext } from 'koa-router';
 import { Server } from 'net';
+import * as Opentracing from 'opentracing';
 import { collectDefaultMetrics, register, Summary } from 'prom-client';
 import 'reflect-metadata';
 
@@ -14,15 +17,13 @@ const bodyParser = require('koa-bodyparser');
 const compress = require('koa-compress');
 const conditional = require('koa-conditional-get');
 const etag = require('koa-etag');
-const koaLogger = require('koa-logger');
 const serveStatic = require('koa-static');
 
 const EXIT_ERROR = 1;
 const DEFAULT_OPTIONS = {
   port: 80,
+  serviceName: 'service',
 };
-
-const log = logger.child({ module: 'service' });
 
 if (process.env.JEST_WORKER_ID === undefined) {
   collectDefaultMetrics();
@@ -45,21 +46,26 @@ export interface MonitorRequest {
   duration: number;
   method: string;
   path: string;
-  route: string;
   status: number;
+}
+
+interface WithTracer {
+  tracer: Opentracing.Tracer;
 }
 
 export type Monitor = (details: MonitorRequest) => void;
 
 export interface ServiceOptions {
-  port: number | string; // server port
-  staticPath?: string; // directory from which to serve static files
-  useLogger?: boolean; // include koa logger
   disableCache?: boolean;
-  monitor?: Monitor;
   isAlive?: () => Promise<boolean>;
   isReady?: () => Promise<boolean>;
+  logger?: Logger;
+  monitor?: Monitor;
   omitMonitoringEndpoints?: boolean;
+  port: number | string; // server port
+  serviceName?: string; // name of service, used for tracing
+  staticPath?: string; // directory from which to serve static files
+  useLogger?: boolean; // include koa logger
 }
 
 const WrapperFormatter = Validator.format.response.WrapperFormatter;
@@ -71,7 +77,8 @@ export const validatorMiddleware: Koa2Middleware = Validator.koa2Middleware({
 });
 
 function ignorePaths(paths: string[], middleware: Middleware): Middleware {
-  return async function(ctx: Router.IRouterContext, next) {
+  // tslint:disable-next-line: space-before-function-paren
+  return async function (ctx: RouterContext, next) {
     if (paths.includes(ctx.path)) {
       await next();
     } else {
@@ -105,12 +112,14 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
   /**
    * Renders monitoring metrics for Prometheus
    */
-  private static async prometheusMetricsEndpoint(ctx: Router.IRouterContext): Promise<void> {
+  private static async prometheusMetricsEndpoint(ctx: RouterContext): Promise<void> {
     ctx.type = register.contentType;
     ctx.body = register.metrics();
   }
 
   public readonly options: TOptions;
+
+  public readonly logger: Logger;
 
   private server: Server | undefined;
 
@@ -121,24 +130,19 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
   constructor(options: TOptions) {
     super();
 
-    this.options = Object.assign({}, DEFAULT_OPTIONS, options);
+    this.options = {
+      ...DEFAULT_OPTIONS,
+      ...options,
+    };
+    this.logger = this.options.logger || logger;
 
-    // use a real logger in production
-    // hide the logger during tests because it's annoying
-    if (this.env !== 'production' && this.env !== 'test' && this.options.useLogger !== false) {
-      if (this.options.omitMonitoringEndpoints) {
-        this.use(koaLogger());
-      } else {
-        this.use(ignorePaths(
-          MONITORING_ENDPOINTS,
-          koaLogger(),
-        ));
-      }
-    }
+    koaOpentracing(this, {
+      appname: this.options.serviceName || DEFAULT_OPTIONS.serviceName,
+    });
 
     this.use(ignorePaths(
       MONITORING_ENDPOINTS,
-      this.monitorMiddleware(),
+      this.observeMiddleware(),
     ));
     this.use(KoaService.errorMiddleware());
     this.use(this.securityHeaderMiddleware());
@@ -146,7 +150,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
     this.use(etag());
     this.use(compress());
     if (this.options.staticPath) {
-      log(`Serving static content from ${this.options.staticPath}`);
+      this.logger(`Serving static content from ${this.options.staticPath}`);
       this.use(serveStatic(this.options.staticPath));
     }
     this.use(bodyParser());
@@ -182,30 +186,45 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
     this.server = undefined;
   }
 
-  protected monitorMiddleware(): Middleware {
-    const middleware = async (ctx: Router.IRouterContext, next: () => Promise<any>): Promise<void> => {
+  protected observeMiddleware(): Middleware {
+    const middleware = async (ctx: RouterContext & WithLogger & WithTracer, next: () => Promise<any>): Promise<void> => {
       const started = Date.now();
+      const span = ctx.tracer.startSpan(ctx.path, { startTime: started });
+      const { spanId, traceId } = span.context() as any;
 
+      ctx.logger = this.logger.child({
+        host: ctx.host,
+        ip: ctx.ip,
+        method: ctx.method,
+        path: ctx.request.url,
+        spanId,
+        traceId,
+      });
+
+      if (this.options.useLogger !== false) {
+        ctx.logger('<--');
+      }
       await next();
 
       const duration = Date.now() - started;
+      span.finish(duration);
       try {
         responseSummary.observe({
           method: ctx.method,
-          route: (ctx as any)._matchedRoute,
           status: String(ctx.status),
         }, duration);
 
-        if (!this.options.monitor) return;
-        await this.options.monitor({
+        this.options.monitor && this.options.monitor({
           duration,
           method: ctx.method,
           path: ctx.path,
-          route: (ctx as any)._matchedRoute,
           status: ctx.status,
         });
+        if (this.options.useLogger !== false) {
+          ctx.logger('-->', { duration, status: ctx.status });
+        }
       } catch (err) {
-        log.error(err);
+        ctx.logger.error(err);
       }
     };
     return middleware.bind(this);
@@ -244,7 +263,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
    */
   protected startServer(): void {
     this.server = this.listen(this.options.port, () => {
-      log(`HTTP started on http://localhost:${this.options.port}/`);
+      this.logger(`HTTP started on http://localhost:${this.options.port}/`);
     });
   }
 
@@ -252,7 +271,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
    * Handle Koa app errors
    */
   private onError(error: any): void | never {
-    log.error(error);
+    this.logger.error(error);
     if (error.syscall !== 'listen') {
       return;
     }
@@ -277,7 +296,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
   }
 
   private livenessEndpoint() {
-    const endpoint = async (ctx: Router.IRouterContext): Promise<void> => {
+    const endpoint = async (ctx: RouterContext): Promise<void> => {
       let alive;
       try {
         alive = this.options.isAlive ? await this.options.isAlive() : true;
@@ -294,7 +313,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
   }
 
   private readinessEndpoint() {
-    const endpoint = async (ctx: Router.IRouterContext): Promise<void> => {
+    const endpoint = async (ctx: RouterContext): Promise<void> => {
       let ready;
       try {
         ready = this.options.isReady ? await this.options.isReady() : true;

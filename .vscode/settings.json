@@ -3,5 +3,14 @@
   "editor.formatOnSave": true,
   "tslint.autoFixOnSave": true,
   "files.trimTrailingWhitespace": true,
-  "files.insertFinalNewline": true
+  "files.insertFinalNewline": true,
+  "cSpell.words": [
+    "Opentracing",
+    "appname",
+    "bodyparser",
+    "cacheable",
+    "etag",
+    "geeebe",
+    "nosniff"
+  ]
 }
