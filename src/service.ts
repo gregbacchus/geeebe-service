@@ -138,6 +138,19 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
 
     koaOpentracing(this, {
       appname: this.options.serviceName || DEFAULT_OPTIONS.serviceName,
+      carrier: {
+        'http-header': {
+          extract(header: any) {
+            const traceId = String(header['x-request-id']).substr(0, 32);
+            const spanId = String(header['x-request-id']).substr(32, 16);
+            return { traceId, spanId };
+          },
+          inject(spanContext: any): any {
+            return { 'x-request-id': spanContext.traceId + spanContext.spanId };
+          },
+        },
+      },
+      httpCarrier: null,
     });
 
     this.use(ignorePaths(
@@ -189,7 +202,12 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
   protected observeMiddleware(): Middleware {
     const middleware = async (ctx: RouterContext & WithLogger & WithTracer, next: () => Promise<any>): Promise<void> => {
       const started = Date.now();
-      const span = ctx.tracer.startSpan(ctx.path, { startTime: started });
+
+      const spanContext = ctx.tracer.extract('http-header', ctx.request.headers) || undefined;
+      const span = ctx.tracer.startSpan(ctx.path, {
+        childOf: spanContext,
+        startTime: started,
+      });
       const { spanId, traceId } = span.context() as any;
 
       ctx.logger = this.logger.child({
