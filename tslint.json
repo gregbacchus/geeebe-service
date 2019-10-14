@@ -1,6 +1,6 @@
 {
   "enable": true,
-  "extends": "./node_modules/tslint/lib/configs/recommended",
+  "extends": "tslint:recommended",
   "defaultSeverity": "error",
   "jsRules": {},
   "rules": {
@@ -11,7 +11,8 @@
     },
     "quotemark": [
       true,
-      "single"
+      "single",
+      "avoid-escape"
     ],
     "curly": [
       true,
