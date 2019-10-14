@@ -53,7 +53,7 @@ interface WithTracer {
   tracer: Opentracing.Tracer;
 }
 
-interface WithSpan {
+export interface WithSpan {
   span: Opentracing.Span;
 }
 
