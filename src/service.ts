@@ -53,6 +53,12 @@ interface WithTracer {
   tracer: Opentracing.Tracer;
 }
 
+interface WithSpan {
+  span: Opentracing.Span;
+}
+
+type ServiceContext = RouterContext & WithLogger & WithTracer & WithSpan;
+
 export type Monitor = (details: MonitorRequest) => void;
 
 export interface ServiceOptions {
@@ -200,11 +206,11 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
   }
 
   protected observeMiddleware(): Middleware {
-    const middleware = async (ctx: RouterContext & WithLogger & WithTracer, next: () => Promise<any>): Promise<void> => {
+    const middleware = async (ctx: ServiceContext, next: () => Promise<any>): Promise<void> => {
       const started = Date.now();
 
       const spanContext = ctx.tracer.extract('http-header', ctx.request.headers) || undefined;
-      const span = ctx.tracer.startSpan(ctx.path, {
+      const span = ctx.span = ctx.tracer.startSpan(ctx.path, {
         childOf: spanContext,
         startTime: started,
       });
