@@ -1,4 +1,3 @@
-import { Api } from '@geeebe/api';
 import { Statuses } from '@geeebe/common';
 import { logger, Logger, WithLogger } from '@geeebe/logging';
 import Validator from 'better-validator';
@@ -12,6 +11,7 @@ import { Server } from 'net';
 import * as Opentracing from 'opentracing';
 import { collectDefaultMetrics, register, Summary } from 'prom-client';
 import 'reflect-metadata';
+import { formatError } from './error';
 
 const bodyParser = require('koa-bodyparser');
 const compress = require('koa-compress');
@@ -101,7 +101,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
    * Returns error formatting middleware
    */
   private static errorMiddleware(): Middleware {
-    return async (ctx: Router.IRouterContext, next) => {
+    return async (ctx: RouterContext, next) => {
       try {
         await next();
 
@@ -110,7 +110,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
           ctx.status = Statuses.NOT_FOUND;
         }
       } catch (err) {
-        Api.formatError(ctx, err);
+        formatError(ctx, err);
       }
     };
   }
