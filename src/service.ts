@@ -38,8 +38,8 @@ const responseSummary = new Summary({
 });
 
 export interface Service {
-  start(): void;
-  stop(): void;
+  start(): Promise<void>;
+  stop(): Promise<void>;
 }
 
 export interface MonitorRequest {
@@ -181,7 +181,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
   /**
    * Start the app
    */
-  public start(): void {
+  public start(): Promise<void> {
     if (this.server) throw new Error('Already started');
 
     const router = new Router();
@@ -196,13 +196,20 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
     this.use(router.allowedMethods());
 
     // start server
-    this.startServer();
+    return this.startServer();
   }
 
-  public stop() {
-    if (!this.server) return;
-    this.server.close();
-    this.server = undefined;
+  public stop(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (!this.server) return;
+      this.server.close((err) => {
+        if (err) {
+          return reject(err);
+        }
+        this.server = undefined;
+        resolve();
+      });
+    });
   }
 
   protected observeMiddleware(): Middleware {
@@ -285,9 +292,12 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
   /**
    * Start the web server
    */
-  protected startServer(): void {
-    this.server = this.listen(this.options.port, () => {
-      this.logger(`HTTP started on http://localhost:${this.options.port}/`);
+  protected startServer(): Promise<void> {
+    return new Promise((resolve) => {
+      this.server = this.listen(this.options.port, () => {
+        this.logger(`HTTP started on http://localhost:${this.options.port}/`);
+        resolve();
+      });
     });
   }
 
