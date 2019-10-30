@@ -34,7 +34,7 @@ const MONITORING_ENDPOINTS = ['/alive', '/metrics', '/ready'];
 const responseSummary = new Summary({
   help: 'Response timing',
   labelNames: ['method', 'route', 'status'],
-  name: 'response',
+  name: 'http_response',
 });
 
 export interface Service {
