@@ -1,4 +1,4 @@
-import { Statuses } from '@geeebe/common';
+import { Statuses, Time } from '@geeebe/common';
 import { logger, Logger, WithLogger } from '@geeebe/logging';
 import Validator from 'better-validator';
 import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
@@ -32,7 +32,7 @@ if (process.env.JEST_WORKER_ID === undefined) {
 const MONITORING_ENDPOINTS = ['/alive', '/metrics', '/ready'];
 
 const responseSummary = new Summary({
-  help: 'Response timing',
+  help: 'Response timing (seconds)',
   labelNames: ['method', 'route', 'status'],
   name: 'http_response',
 });
@@ -243,7 +243,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
         responseSummary.observe({
           method: ctx.method,
           status: String(ctx.status),
-        }, duration);
+        }, Time.toSeconds(duration));
 
         this.options.monitor && this.options.monitor({
           duration,
