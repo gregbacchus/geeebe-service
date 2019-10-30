@@ -243,7 +243,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
         responseSummary.observe({
           method: ctx.method,
           status: String(ctx.status),
-        }, Time.toSeconds(duration));
+        }, duration / Time.SECOND);
 
         this.options.monitor && this.options.monitor({
           duration,
