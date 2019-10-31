@@ -15,7 +15,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@geeebe/common": "^1.0.51",
+    "@geeebe/common": "^1.0.55",
     "@geeebe/logging": "^1.0.16",
     "@types/koa": "^2.0.50",
     "@types/koa-router": "^7.0.42",

@@ -1,4 +1,4 @@
-import { Statuses, Time } from '@geeebe/common';
+import { HrTime, Statuses } from '@geeebe/common';
 import { logger, Logger, WithLogger } from '@geeebe/logging';
 import Validator from 'better-validator';
 import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
@@ -214,12 +214,12 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
 
   protected observeMiddleware(): Middleware {
     const middleware = async (ctx: ServiceContext, next: () => Promise<any>): Promise<void> => {
-      const started = Date.now();
+      const started = process.hrtime();
 
       const spanContext = ctx.tracer.extract('http-header', ctx.request.headers) || undefined;
       const span = ctx.span = ctx.tracer.startSpan(ctx.path, {
         childOf: spanContext,
-        startTime: started,
+        startTime: HrTime.toMs(started),
       });
       const { spanId, traceId } = span.context() as any;
 
@@ -237,22 +237,23 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
       }
       await next();
 
-      const duration = Date.now() - started;
-      span.finish(duration);
+      const duration = process.hrtime(started);
+      const durationMs = HrTime.toMs(duration);
+      span.finish(HrTime.toMs(started) + durationMs);
       try {
         responseSummary.observe({
           method: ctx.method,
           status: String(ctx.status),
-        }, duration / Time.SECOND);
+        }, HrTime.toSeconds(duration));
 
         this.options.monitor && this.options.monitor({
-          duration,
+          duration: durationMs,
           method: ctx.method,
           path: ctx.path,
           status: ctx.status,
         });
         if (this.options.useLogger !== false) {
-          ctx.logger('-->', { duration, status: ctx.status });
+          ctx.logger('-->', { duration: durationMs, status: ctx.status });
         }
       } catch (err) {
         ctx.logger.error(err);
