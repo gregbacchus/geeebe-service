@@ -21,6 +21,8 @@ const serveStatic = require('koa-static');
 
 const EXIT_ERROR = 1;
 const DEFAULT_OPTIONS = {
+  observe: true,
+  omitMonitoringEndpoints: false,
   port: 80,
   serviceName: 'service',
 };
@@ -67,6 +69,7 @@ export interface ServiceOptions {
   isReady?: () => Promise<boolean>;
   logger?: Logger;
   monitor?: Monitor;
+  observe?: boolean;
   omitMonitoringEndpoints?: boolean;
   port: number | string; // server port
   serviceName?: string; // name of service, used for tracing
@@ -159,10 +162,12 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
       httpCarrier: null,
     });
 
-    this.use(ignorePaths(
-      MONITORING_ENDPOINTS,
-      this.observeMiddleware(),
-    ));
+    if (this.options.observe) {
+      this.use(ignorePaths(
+        MONITORING_ENDPOINTS,
+        this.observeMiddleware(),
+      ));
+    }
     this.use(KoaService.errorMiddleware());
     this.use(this.securityHeaderMiddleware());
     this.use(conditional());
