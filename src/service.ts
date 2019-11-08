@@ -206,7 +206,8 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
 
   public stop(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      if (!this.server) return;
+      if (!this.server) return resolve();
+
       this.server.close((err) => {
         if (err) {
           return reject(err);
