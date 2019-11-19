@@ -279,9 +279,8 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
       ctx.set('X-XSS-Protection', '1; mode=block');
       ctx.set('X-Content-Type-Options', 'nosniff');
 
-      const cacheablePath = /\/(node_modules|scripts)\//.test(ctx.path);
       const cacheableExtension = ctx.path.endsWith('.js') || ctx.path.endsWith('.css') || ctx.path.endsWith('.html');
-      if (!this.options.disableCache && cacheablePath && cacheableExtension) {
+      if (!this.options.disableCache && cacheableExtension) {
         ctx.set('Cache-Control', 'max-age=3600');
       } else {
         ctx.set('Cache-Control', 'max-age=0');
