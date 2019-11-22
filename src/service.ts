@@ -256,14 +256,14 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
   }
 }
 
-export interface MetricsServiceOptions {
+export interface MonitorServiceOptions {
   isAlive?: () => Promise<boolean>;
   isReady?: () => Promise<boolean>;
   logger?: Logger;
   port: number | string; // server port
 }
 
-export abstract class MetricsService extends Koa implements Service {
+export abstract class MonitorService extends Koa implements Service {
   public readonly logger: Logger;
 
   private server: Server | undefined;
@@ -272,7 +272,7 @@ export abstract class MetricsService extends Koa implements Service {
    * Create Koa app
    * @param options
    */
-  constructor(public readonly options: MetricsServiceOptions) {
+  constructor(public readonly options: MonitorServiceOptions) {
     super();
 
     this.logger = this.options.logger || logger;
