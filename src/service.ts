@@ -263,7 +263,7 @@ export interface MonitorServiceOptions {
   port: number | string; // server port
 }
 
-export abstract class MonitorService extends Koa implements Service {
+export class MonitorService extends Koa implements Service {
   public readonly logger: Logger;
 
   private server: Server | undefined;
