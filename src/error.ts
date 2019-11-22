@@ -1,8 +1,10 @@
 import { Statuses } from '@geeebe/common';
-import { logger, WithLogger } from '@geeebe/logging';
+import { logger, Logger, WithLogger } from '@geeebe/logging';
 import { Context } from 'koa';
 
 const debug = logger.child({});
+
+const EXIT_ERROR = 1;
 
 //noinspection JSUnusedGlobalSymbols
 /**
@@ -43,3 +45,31 @@ export function formatError(ctx: Context & Partial<WithLogger>, err: any): void 
   }
   ctx.body = { error: data };
 }
+
+/**
+ * Handle Koa app errors
+ */
+export const onError = (port: number | string, log: Logger) => (error: any): void | never => {
+  log.error(error);
+  if (error.syscall !== 'listen') {
+    return;
+  }
+
+  const bind = typeof port === 'string'
+    ? `Pipe ${port}`
+    : `Port ${port}`;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(`${bind} requires elevated privileges`);
+      process.exit(EXIT_ERROR); // eslint-disable-line no-process-exit
+      break;
+    case 'EADDRINUSE':
+      console.error(`${bind} is already in use`);
+      process.exit(EXIT_ERROR); // eslint-disable-line no-process-exit
+      break;
+    default:
+      throw error;
+  }
+};

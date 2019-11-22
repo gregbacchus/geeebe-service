@@ -1,4 +1,4 @@
-import { HrTime, Statuses } from '@geeebe/common';
+import { HrTime } from '@geeebe/common';
 import { logger, Logger, WithLogger } from '@geeebe/logging';
 import Validator from 'better-validator';
 import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
@@ -11,7 +11,8 @@ import { Server } from 'net';
 import * as Opentracing from 'opentracing';
 import { collectDefaultMetrics, register, Summary } from 'prom-client';
 import 'reflect-metadata';
-import { formatError } from './error';
+import { onError } from './error';
+import { errorMiddleware, ignorePaths, livenessEndpoint, readinessEndpoint, securityHeaderMiddleware } from './middleware';
 
 const bodyParser = require('koa-bodyparser');
 const compress = require('koa-compress');
@@ -19,7 +20,6 @@ const conditional = require('koa-conditional-get');
 const etag = require('koa-etag');
 const serveStatic = require('koa-static');
 
-const EXIT_ERROR = 1;
 const DEFAULT_OPTIONS = {
   observe: true,
   omitMonitoringEndpoints: false,
@@ -38,6 +38,14 @@ const responseSummary = new Summary({
   labelNames: ['method', 'route', 'status'],
   name: 'http_response',
 });
+
+/**
+ * Renders monitoring metrics for Prometheus
+ */
+const prometheusMetricsEndpoint = () => async (ctx: RouterContext): Promise<void> => {
+  ctx.type = register.contentType;
+  ctx.body = register.metrics();
+};
 
 export interface Service {
   start(): Promise<void>;
@@ -85,47 +93,8 @@ export const validatorMiddleware: Koa2Middleware = Validator.koa2Middleware({
   responseFormatter: new WrapperFormatter({}),
 });
 
-function ignorePaths(paths: string[], middleware: Middleware): Middleware {
-  // tslint:disable-next-line: space-before-function-paren
-  return async function (ctx: RouterContext, next) {
-    if (paths.includes(ctx.path)) {
-      await next();
-    } else {
-      // must .call() to explicitly set the receiver
-      await middleware.call(this, ctx, next);
-    }
-  };
-}
-
 //noinspection JSUnusedGlobalSymbols
 export abstract class KoaService<TOptions extends ServiceOptions> extends Koa implements Service {
-
-  /**
-   * Returns error formatting middleware
-   */
-  private static errorMiddleware(): Middleware {
-    return async (ctx: RouterContext, next) => {
-      try {
-        await next();
-
-        if (ctx.status === Statuses.NOT_FOUND) {
-          ctx.body = { error: { type: 'NotFoundError', message: 'Not Found' } };
-          ctx.status = Statuses.NOT_FOUND;
-        }
-      } catch (err) {
-        formatError(ctx, err);
-      }
-    };
-  }
-
-  /**
-   * Renders monitoring metrics for Prometheus
-   */
-  private static async prometheusMetricsEndpoint(ctx: RouterContext): Promise<void> {
-    ctx.type = register.contentType;
-    ctx.body = register.metrics();
-  }
-
   public readonly options: TOptions;
 
   public readonly logger: Logger;
@@ -168,8 +137,8 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
         this.observeMiddleware(),
       ));
     }
-    this.use(KoaService.errorMiddleware());
-    this.use(this.securityHeaderMiddleware());
+    this.use(errorMiddleware());
+    this.use(securityHeaderMiddleware(this.options.disableCache));
     this.use(conditional());
     this.use(etag());
     this.use(compress());
@@ -179,7 +148,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
     }
     this.use(bodyParser());
 
-    this.on('error', this.onError);
+    this.on('error', onError(this.options.port, this.logger));
   }
 
   //noinspection JSUnusedGlobalSymbols
@@ -191,9 +160,9 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
 
     const router = new Router();
     if (!this.options.omitMonitoringEndpoints) {
-      router.get('/alive', this.livenessEndpoint());
-      router.get('/metrics', KoaService.prometheusMetricsEndpoint);
-      router.get('/ready', this.readinessEndpoint());
+      router.get('/alive', livenessEndpoint(this.options.isAlive));
+      router.get('/metrics', prometheusMetricsEndpoint());
+      router.get('/ready', readinessEndpoint(this.options.isReady));
     }
     this.mountApi(router);
 
@@ -269,28 +238,6 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
   }
 
   /**
-   * Adds headers for additional security
-   */
-  protected securityHeaderMiddleware(): Middleware {
-    const middleware = async (ctx: Router.IRouterContext, next: () => Promise<any>): Promise<void> => {
-      await next();
-
-      ctx.set('X-Frame-Options', 'DENY');
-      ctx.set('X-XSS-Protection', '1; mode=block');
-      ctx.set('X-Content-Type-Options', 'nosniff');
-
-      const cacheableExtension = ctx.path.endsWith('.js') || ctx.path.endsWith('.css') || ctx.path.endsWith('.html');
-      if (!this.options.disableCache && cacheableExtension) {
-        ctx.set('Cache-Control', 'max-age=3600');
-      } else {
-        ctx.set('Cache-Control', 'max-age=0');
-        ctx.set('Pragma', 'no-cache');
-      }
-    };
-    return middleware.bind(this);
-  }
-
-  /**
    * Override to mount API routes
    */
   protected abstract mountApi(router: Router): void;
@@ -299,73 +246,77 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
    * Start the web server
    */
   protected startServer(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      if (this.server) return reject(new Error('Already started'));
       this.server = this.listen(this.options.port, () => {
         this.logger(`HTTP started on http://localhost:${this.options.port}/`);
         resolve();
       });
     });
   }
+}
+
+export interface MetricsServiceOptions {
+  isAlive?: () => Promise<boolean>;
+  isReady?: () => Promise<boolean>;
+  logger?: Logger;
+  port: number | string; // server port
+}
+
+export abstract class MetricsService extends Koa implements Service {
+  public readonly logger: Logger;
+
+  private server: Server | undefined;
 
   /**
-   * Handle Koa app errors
+   * Create Koa app
+   * @param options
    */
-  private onError(error: any): void | never {
-    this.logger.error(error);
-    if (error.syscall !== 'listen') {
-      return;
-    }
+  constructor(public readonly options: MetricsServiceOptions) {
+    super();
 
-    const bind = typeof this.options.port === 'string'
-      ? `Pipe ${this.options.port}`
-      : `Port ${this.options.port}`;
+    this.logger = this.options.logger || logger;
+    this.use(errorMiddleware());
 
-    // handle specific listen errors with friendly messages
-    switch (error.code) {
-      case 'EACCES':
-        console.error(`${bind} requires elevated privileges`);
-        process.exit(EXIT_ERROR); // eslint-disable-line no-process-exit
-        break;
-      case 'EADDRINUSE':
-        console.error(`${bind} is already in use`);
-        process.exit(EXIT_ERROR); // eslint-disable-line no-process-exit
-        break;
-      default:
-        throw error;
-    }
+    this.on('error', onError(this.options.port, this.logger));
   }
 
-  private livenessEndpoint() {
-    const endpoint = async (ctx: RouterContext): Promise<void> => {
-      let alive;
-      try {
-        alive = this.options.isAlive ? await this.options.isAlive() : true;
-      } catch (err) {
-        alive = false;
-      }
-      ctx.body = { alive };
-      if (!alive) {
-        ctx.status = Statuses.SERVICE_UNAVAILABLE;
-        ctx.response.headers['Retry-After'] = 30;
-      }
-    };
-    return endpoint.bind(this);
+  //noinspection JSUnusedGlobalSymbols
+  /**
+   * Start the app
+   */
+  public start(): Promise<void> {
+    if (this.server) throw new Error('Already started');
+
+    const router = new Router();
+    router.get('/alive', livenessEndpoint(this.options.isAlive));
+    router.get('/metrics', prometheusMetricsEndpoint());
+    router.get('/ready', readinessEndpoint(this.options.isReady));
+
+    this.use(router.routes());
+    this.use(router.allowedMethods());
+
+    // start server
+    return new Promise((resolve, reject) => {
+      if (this.server) return reject(new Error('Already started'));
+      this.server = this.listen(this.options.port, () => {
+        this.logger(`Monitoring started on http://localhost:${this.options.port}/`);
+        resolve();
+      });
+    });
   }
 
-  private readinessEndpoint() {
-    const endpoint = async (ctx: RouterContext): Promise<void> => {
-      let ready;
-      try {
-        ready = this.options.isReady ? await this.options.isReady() : true;
-      } catch (err) {
-        ready = false;
-      }
-      ctx.body = { ready };
-      if (!ready) {
-        ctx.status = Statuses.SERVICE_UNAVAILABLE;
-        ctx.response.headers['Retry-After'] = 30;
-      }
-    };
-    return endpoint.bind(this);
+  public stop(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (!this.server) return resolve();
+
+      this.server.close((err) => {
+        if (err) {
+          return reject(err);
+        }
+        this.server = undefined;
+        resolve();
+      });
+    });
   }
 }
