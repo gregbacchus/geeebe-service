@@ -15,12 +15,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@geeebe/common": "^1.0.56",
-    "@geeebe/logging": "^1.0.17",
-    "@types/koa": "^2.0.50",
+    "@geeebe/common": "^1.0.62",
+    "@geeebe/logging": "^1.0.19",
+    "@types/koa": "^2.11.0",
     "@types/koa-router": "^7.0.42",
     "better-validator": "^2.1.8",
-    "koa": "^2.10.0",
+    "koa": "^2.11.0",
     "koa-bodyparser": "^4.2.1",
     "koa-compress": "^3.0.0",
     "koa-conditional-get": "^2.0.0",
@@ -33,13 +33,13 @@
   },
   "types": "./src/index.ts",
   "devDependencies": {
-    "@types/jest": "^23.3.14",
-    "@types/node": "^10.14.21",
+    "@types/jest": "^24.0.23",
+    "@types/node": "^12.12.14",
     "jest": "^25.0.0",
-    "nodemon": "^1.19.3",
-    "ts-jest": "^23.10.5",
-    "ts-node": "^7.0.1",
-    "tslint": "^5.20.0",
-    "typescript": "^3.6.4"
+    "nodemon": "^2.0.1",
+    "ts-jest": "^24.2.0",
+    "ts-node": "^8.5.4",
+    "tslint": "^5.20.1",
+    "typescript": "^3.7.2"
   }
 }
