@@ -76,6 +76,7 @@ export interface ServiceOptions {
   isAlive?: () => Promise<boolean>;
   isReady?: () => Promise<boolean>;
   logger?: Logger;
+  loggerIgnorePath?: RegExp;
   monitor?: Monitor;
   observe?: boolean;
   omitMonitoringEndpoints?: boolean;
@@ -207,7 +208,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
         traceId,
       });
 
-      if (this.options.useLogger !== false) {
+      if (this.options.useLogger !== false && !this.options.loggerIgnorePath?.test(ctx.request.url)) {
         ctx.logger('<--');
       }
       await next();
@@ -227,7 +228,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
           path: ctx.path,
           status: ctx.status,
         });
-        if (this.options.useLogger !== false) {
+        if (this.options.useLogger !== false && !this.options.loggerIgnorePath?.test(ctx.request.url)) {
           ctx.logger('-->', { duration: durationMs, status: ctx.status });
         }
       } catch (err) {
