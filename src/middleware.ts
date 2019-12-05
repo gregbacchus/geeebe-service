@@ -3,12 +3,10 @@ import { Middleware } from 'koa';
 import { RouterContext } from 'koa-router';
 import { formatError } from './error';
 
-import Router = require('koa-router');
-
 /**
  * Returns error formatting middleware
  */
-export const errorMiddleware = (): Middleware => async (ctx: RouterContext, next) => {
+export const errorMiddleware = (): Middleware => async (ctx, next) => {
   try {
     await next();
 
@@ -28,7 +26,7 @@ export const errorMiddleware = (): Middleware => async (ctx: RouterContext, next
  */
 export const ignorePaths = (paths: string[], middleware: Middleware): Middleware => {
   // tslint:disable-next-line: space-before-function-paren
-  return async function (ctx: RouterContext, next) {
+  return async function (ctx, next) {
     if (paths.includes(ctx.path)) {
       await next();
     } else {
@@ -41,7 +39,7 @@ export const ignorePaths = (paths: string[], middleware: Middleware): Middleware
 /**
  * Adds headers for additional security
  */
-export const securityHeaderMiddleware = (disableCache?: boolean): Middleware => async (ctx: Router.RouterContext, next: () => Promise<any>): Promise<void> => {
+export const securityHeaderMiddleware = (disableCache?: boolean): Middleware => async (ctx, next: () => Promise<any>): Promise<void> => {
   await next();
 
   ctx.set('X-Frame-Options', 'DENY');
