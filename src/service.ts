@@ -115,7 +115,7 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
     };
     this.logger = this.options.logger || logger;
 
-    koaOpentracing(this, {
+    koaOpentracing(this as any, {
       appname: this.options.serviceName || DEFAULT_OPTIONS.serviceName,
       carrier: {
         'http-header': {
