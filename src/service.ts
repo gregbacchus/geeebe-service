@@ -12,7 +12,7 @@ import * as Opentracing from 'opentracing';
 import { collectDefaultMetrics, register, Summary } from 'prom-client';
 import 'reflect-metadata';
 import { onError } from './error';
-import { errorMiddleware, ignorePaths, livenessEndpoint, readinessEndpoint, securityHeaderMiddleware } from './middleware';
+import { errorMiddleware, ignorePaths, livenessEndpoint, noCacheMiddleware, readinessEndpoint, securityHeaderMiddleware } from './middleware';
 
 const bodyParser = require('koa-bodyparser');
 const compress = require('koa-compress');
@@ -139,7 +139,10 @@ export abstract class KoaService<TOptions extends ServiceOptions> extends Koa im
       ));
     }
     this.use(errorMiddleware());
-    this.use(securityHeaderMiddleware(this.options.disableCache));
+    this.use(securityHeaderMiddleware());
+    if (this.options.disableCache) {
+      this.use(noCacheMiddleware());
+    }
     this.use(conditional());
     this.use(etag());
     this.use(compress());
