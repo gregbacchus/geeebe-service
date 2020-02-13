@@ -95,7 +95,7 @@ export const validatorMiddleware: Koa2Middleware = Validator.koa2Middleware({
 });
 
 //noinspection JSUnusedGlobalSymbols
-export abstract class KoaService<TOptions extends ServiceOptions> extends Koa implements Service {
+export abstract class KoaService<TOptions extends ServiceOptions = ServiceOptions> extends Koa implements Service {
   public readonly options: TOptions;
 
   public readonly logger: Logger;
@@ -267,7 +267,7 @@ export interface MonitorServiceOptions {
   port: number | string; // server port
 }
 
-export class MonitorService extends Koa implements Service {
+export class MonitorService<TOptions extends MonitorServiceOptions = MonitorServiceOptions> extends Koa implements Service {
   public readonly logger: Logger;
 
   private server: Server | undefined;
@@ -276,7 +276,7 @@ export class MonitorService extends Koa implements Service {
    * Create Koa app
    * @param options
    */
-  constructor(public readonly options: MonitorServiceOptions) {
+  constructor(public readonly options: TOptions) {
     super();
 
     this.logger = this.options.logger || logger;
