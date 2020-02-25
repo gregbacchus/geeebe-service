@@ -9,10 +9,11 @@ import * as Router from 'koa-router';
 import { RouterContext } from 'koa-router';
 import { Server } from 'net';
 import * as Opentracing from 'opentracing';
-import { collectDefaultMetrics, register, Summary } from 'prom-client';
+import { collectDefaultMetrics, Summary } from 'prom-client';
 import 'reflect-metadata';
 import { onError } from './error';
 import { errorMiddleware, ignorePaths, livenessEndpoint, noCacheMiddleware, readinessEndpoint, securityHeaderMiddleware } from './middleware';
+import { prometheusMetricsEndpoint } from './prometheus';
 
 const bodyParser = require('koa-bodyparser');
 const compress = require('koa-compress');
@@ -38,14 +39,6 @@ const responseSummary = new Summary({
   labelNames: ['method', 'route', 'status'],
   name: 'http_response',
 });
-
-/**
- * Renders monitoring metrics for Prometheus
- */
-const prometheusMetricsEndpoint = () => async (ctx: RouterContext): Promise<void> => {
-  ctx.type = register.contentType;
-  ctx.body = register.metrics();
-};
 
 export interface Service {
   start(): Promise<void>;
@@ -254,71 +247,6 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
       if (this.server) return reject(new Error('Already started'));
       this.server = this.listen(this.options.port, () => {
         this.logger(`HTTP started on http://localhost:${this.options.port}/`);
-        resolve();
-      });
-    });
-  }
-}
-
-export interface MonitorServiceOptions {
-  isAlive?: () => Promise<boolean>;
-  isReady?: () => Promise<boolean>;
-  logger?: Logger;
-  port: number | string; // server port
-}
-
-export class MonitorService<TOptions extends MonitorServiceOptions = MonitorServiceOptions> extends Koa implements Service {
-  public readonly logger: Logger;
-
-  private server: Server | undefined;
-
-  /**
-   * Create Koa app
-   * @param options
-   */
-  constructor(public readonly options: TOptions) {
-    super();
-
-    this.logger = this.options.logger || logger;
-    this.use(errorMiddleware());
-
-    this.on('error', onError(this.options.port, this.logger));
-  }
-
-  //noinspection JSUnusedGlobalSymbols
-  /**
-   * Start the app
-   */
-  public start(): Promise<void> {
-    if (this.server) throw new Error('Already started');
-
-    const router = new Router();
-    router.get('/alive', livenessEndpoint(this.options.isAlive));
-    router.get('/metrics', prometheusMetricsEndpoint());
-    router.get('/ready', readinessEndpoint(this.options.isReady));
-
-    this.use(router.routes());
-    this.use(router.allowedMethods());
-
-    // start server
-    return new Promise((resolve, reject) => {
-      if (this.server) return reject(new Error('Already started'));
-      this.server = this.listen(this.options.port, () => {
-        this.logger(`Monitoring started on http://localhost:${this.options.port}/`);
-        resolve();
-      });
-    });
-  }
-
-  public stop(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      if (!this.server) return resolve();
-
-      this.server.close((err) => {
-        if (err) {
-          return reject(err);
-        }
-        this.server = undefined;
         resolve();
       });
     });
