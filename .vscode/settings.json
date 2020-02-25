@@ -6,11 +6,14 @@
   "files.insertFinalNewline": true,
   "cSpell.words": [
     "Opentracing",
+    "Prefetch",
     "appname",
     "bodyparser",
     "cacheable",
     "etag",
+    "frameguard",
     "geeebe",
+    "hpkp",
     "nosniff"
   ]
 }

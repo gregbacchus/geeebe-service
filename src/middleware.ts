@@ -39,21 +39,6 @@ export const ignorePaths = (paths: string[], middleware: Middleware): Middleware
 /**
  * Adds headers for additional security
  */
-export const securityHeaderMiddleware = (): Middleware => async (ctx, next: () => Promise<any>): Promise<void> => {
-  await next();
-
-  ctx.set('X-Frame-Options', 'DENY');
-  ctx.set('X-XSS-Protection', '1; mode=block');
-  ctx.set('X-Content-Type-Options', 'nosniff');
-};
-
-export const noCacheMiddleware = (): Middleware => async (ctx, next: () => Promise<any>): Promise<void> => {
-  await next();
-
-  ctx.set('Cache-Control', 'max-age=0');
-  ctx.set('Pragma', 'no-cache');
-};
-
 export const maxCacheMiddleware = (): Middleware => async (ctx, next: () => Promise<any>): Promise<void> => {
   await next();
 

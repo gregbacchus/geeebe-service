@@ -1,3 +1,4 @@
+export * from './helmet';
 export * from './koa-service';
 export * from './monitoring-service';
 export * from './service';

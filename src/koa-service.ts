@@ -2,8 +2,10 @@ import { HrTime } from '@geeebe/common';
 import { logger, Logger, WithLogger } from '@geeebe/logging';
 import Validator from 'better-validator';
 import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
+import { IHelmetConfiguration } from 'helmet';
 import * as Koa from 'koa';
 import { Middleware } from 'koa';
+import * as helmet from 'koa-helmet';
 import * as koaOpentracing from 'koa-opentracing';
 import * as Router from 'koa-router';
 import { RouterContext } from 'koa-router';
@@ -12,7 +14,8 @@ import * as Opentracing from 'opentracing';
 import { collectDefaultMetrics, Summary } from 'prom-client';
 import 'reflect-metadata';
 import { onError } from './error';
-import { errorMiddleware, ignorePaths, livenessEndpoint, noCacheMiddleware, readinessEndpoint, securityHeaderMiddleware } from './middleware';
+import { DEFAULT_HELMET_OPTIONS } from './helmet';
+import { errorMiddleware, ignorePaths, livenessEndpoint, readinessEndpoint } from './middleware';
 import { prometheusMetricsEndpoint } from './prometheus';
 import { Service } from './service';
 
@@ -23,6 +26,7 @@ const etag = require('koa-etag');
 const serveStatic = require('koa-static');
 
 const DEFAULT_OPTIONS = {
+  helmetOptions: DEFAULT_HELMET_OPTIONS,
   observe: true,
   omitMonitoringEndpoints: false,
   port: 80,
@@ -61,7 +65,7 @@ type ServiceContext = RouterContext & WithLogger & WithTracer & WithSpan;
 export type Monitor = (details: MonitorRequest) => void;
 
 export interface ServiceOptions {
-  disableCache?: boolean;
+  helmetOptions?: false | IHelmetConfiguration;
   isAlive?: () => Promise<boolean>;
   isReady?: () => Promise<boolean>;
   logger?: Logger;
@@ -128,9 +132,8 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
       ));
     }
     this.use(errorMiddleware());
-    this.use(securityHeaderMiddleware());
-    if (this.options.disableCache) {
-      this.use(noCacheMiddleware());
+    if (this.options.helmetOptions !== false) {
+      this.use(helmet(this.options.helmetOptions));
     }
     this.use(conditional());
     this.use(etag());
