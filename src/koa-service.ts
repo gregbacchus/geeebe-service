@@ -230,7 +230,7 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
         ctx.logger.error(err);
       }
     };
-    return middleware.bind(this);
+    return middleware.bind(this) as Middleware;
   }
 
   /**

@@ -5,21 +5,19 @@
     "experimentalDecorators": true,
     "inlineSources": true,
     "lib": [
-      "dom",
-      "es2015",
-      "es7",
-      "esnext.asynciterable"
+      "es2018",
+      "esnext.asynciterable",
+      "DOM"
     ],
     "module": "commonjs",
     "moduleResolution": "node",
-    "noImplicitAny": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "removeComments": true,
     "skipLibCheck": true,
     "sourceMap": true,
-    "strictNullChecks": true,
-    "target": "es2015",
+    "strict": true,
+    "target": "ES2015",
     "types": [
       "node",
       "jest"
