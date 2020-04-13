@@ -26,7 +26,7 @@ export const errorMiddleware = (): Middleware => async (ctx, next) => {
  */
 export const ignorePaths = (paths: string[], middleware: Middleware): Middleware => {
   // tslint:disable-next-line: space-before-function-paren
-  return async function (ctx, next) {
+  return async function (this: any, ctx, next) {
     if (paths.includes(ctx.path)) {
       await next();
     } else {
