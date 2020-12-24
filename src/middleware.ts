@@ -1,7 +1,42 @@
-import { Statuses } from '@geeebe/common';
+import { HrTime, Statuses } from '@geeebe/common';
+import { Logger, WithLogger } from '@geeebe/logging';
+import { RouterContext } from '@koa/router';
 import { Middleware } from 'koa';
-import { RouterContext } from 'koa-router';
+import { Tracer } from 'koa-opentracing';
+import { Span } from 'opentracing';
+import { Summary } from 'prom-client';
 import { formatError } from './error';
+
+const responseSummary = new Summary({
+  help: 'Response timing (seconds)',
+  labelNames: ['method', 'route', 'status'],
+  name: 'http_response',
+});
+
+interface WithTracer {
+  tracer: Tracer;
+}
+
+export interface WithSpan {
+  span: Span;
+}
+
+type ServiceContext = RouterContext & WithLogger & WithTracer & WithSpan;
+
+export interface MonitorRequest {
+  duration: number;
+  method: string;
+  path: string;
+  status: number;
+}
+
+export type Monitor = (details: MonitorRequest) => void;
+
+export interface ObserveMiddlewareOptions {
+  useLogger?: boolean;
+  loggerIgnorePath?: RegExp;
+  monitor?: Monitor;
+}
 
 /**
  * Returns error formatting middleware
@@ -71,4 +106,54 @@ export const readinessEndpoint = (isReady?: () => Promise<boolean>) => async (ct
     ctx.status = Statuses.SERVICE_UNAVAILABLE;
     ctx.response.headers['Retry-After'] = 30;
   }
+};
+
+export const observeMiddleware = (logger: Logger, options: ObserveMiddlewareOptions): Middleware => {
+  const middleware = async (ctx: ServiceContext, next: () => Promise<any>): Promise<void> => {
+    const started = process.hrtime();
+
+    const spanContext = ctx.tracer.extract('http-header', ctx.request.headers) || undefined;
+    const span = ctx.span = ctx.tracer.startSpan(ctx.path, {
+      childOf: spanContext,
+      startTime: HrTime.toMs(started),
+    });
+    const { spanId, traceId } = span.context() as any;
+
+    ctx.logger = logger.child({
+      host: ctx.host,
+      ip: ctx.ip,
+      method: ctx.method,
+      path: ctx.request.url,
+      spanId,
+      traceId,
+    });
+
+    if (options.useLogger !== false && !options.loggerIgnorePath?.test(ctx.request.url)) {
+      ctx.logger('<--');
+    }
+    await next();
+
+    const duration = process.hrtime(started);
+    const durationMs = HrTime.toMs(duration);
+    span.finish(HrTime.toMs(started) + durationMs);
+    try {
+      responseSummary.observe({
+        method: ctx.method,
+        status: String(ctx.status),
+      }, HrTime.toSeconds(duration));
+
+      options.monitor && options.monitor({
+        duration: durationMs,
+        method: ctx.method,
+        path: ctx.path,
+        status: ctx.status,
+      });
+      if (options.useLogger !== false && !options.loggerIgnorePath?.test(ctx.request.url)) {
+        ctx.logger('-->', { duration: durationMs, status: ctx.status });
+      }
+    } catch (err) {
+      ctx.logger.error(err);
+    }
+  };
+  return middleware as Middleware;
 };

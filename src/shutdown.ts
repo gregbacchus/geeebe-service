@@ -1,5 +1,6 @@
 import { Duration } from '@geeebe/common';
 import { logger } from '@geeebe/logging';
+import { Service } from './service';
 
 const log = logger.child({ module: 'service:shutdown' });
 
@@ -50,4 +51,40 @@ export function graceful(grace: Duration, prepare?: () => any | Promise<any>, fi
   });
 
   return status;
+}
+
+export type ServiceFactory = (isReady: () => boolean) => Service;
+
+export class Graceful implements Service {
+  public static service(grace: Duration, factory: ServiceFactory): Promise<void> {
+    const service = new Graceful(grace, factory);
+    return service.start();
+  }
+
+  private readonly service: Service;
+
+  private running = false;
+
+  private constructor(grace: Duration, factory: ServiceFactory) {
+    this.service = factory(this.isReady);
+    graceful(
+      grace,
+      () => this.service.shutdown(),
+      () => this.service.destroy(),
+    );
+  }
+
+  public isReady = (): boolean => this.running;
+
+  public start = (): Promise<void> => {
+    this.running = true;
+    return this.service.start();
+  }
+
+  public shutdown = (): Promise<void> => {
+    this.running = false;
+    return this.service.shutdown();
+  }
+
+  public destroy = (): Promise<void> => this.service.destroy();
 }

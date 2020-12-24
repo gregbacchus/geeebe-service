@@ -1,4 +1,4 @@
-import { RouterContext } from 'koa-router';
+import { RouterContext } from '@koa/router';
 import { register } from 'prom-client';
 
 /**

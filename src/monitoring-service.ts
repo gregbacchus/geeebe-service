@@ -1,6 +1,6 @@
 import { logger, Logger } from '@geeebe/logging';
+import * as Router from '@koa/router';
 import * as Koa from 'koa';
-import * as Router from 'koa-router';
 import { Server } from 'net';
 import 'reflect-metadata';
 import { onError } from './error';
@@ -33,10 +33,6 @@ export class MonitorService<TOptions extends MonitorServiceOptions = MonitorServ
     this.on('error', onError(this.options.port, this.logger));
   }
 
-  //noinspection JSUnusedGlobalSymbols
-  /**
-   * Start the app
-   */
   public start(): Promise<void> {
     if (this.server) throw new Error('Already started');
 
@@ -58,7 +54,11 @@ export class MonitorService<TOptions extends MonitorServiceOptions = MonitorServ
     });
   }
 
-  public stop(): Promise<void> {
+  public shutdown(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  public destroy(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       if (!this.server) return resolve();
 

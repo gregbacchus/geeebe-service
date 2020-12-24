@@ -1,34 +1,27 @@
-import { HrTime } from '@geeebe/common';
-import { logger, Logger, WithLogger } from '@geeebe/logging';
+import { logger, Logger } from '@geeebe/logging';
+import * as Router from '@koa/router';
 import Validator from 'better-validator';
 import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
-import { IHelmetConfiguration } from 'helmet';
 import * as Koa from 'koa';
-import { Middleware } from 'koa';
 import * as helmet from 'koa-helmet';
 import * as koaOpentracing from 'koa-opentracing';
-import * as Router from 'koa-router';
-import { RouterContext } from 'koa-router';
 import { Server } from 'net';
-import * as Opentracing from 'opentracing';
-import { collectDefaultMetrics, Summary } from 'prom-client';
+import { collectDefaultMetrics } from 'prom-client';
 import 'reflect-metadata';
 import { onError } from './error';
-import { DEFAULT_HELMET_OPTIONS } from './helmet';
-import { errorMiddleware, ignorePaths, livenessEndpoint, readinessEndpoint } from './middleware';
-import { prometheusMetricsEndpoint } from './prometheus';
+import { DEFAULT_HELMET_OPTIONS, HelmetOptions } from './helmet';
+import { errorMiddleware, Monitor, observeMiddleware } from './middleware';
 import { Service } from './service';
 
-const bodyParser = require('koa-bodyparser');
-const compress = require('koa-compress');
-const conditional = require('koa-conditional-get');
-const etag = require('koa-etag');
-const serveStatic = require('koa-static');
+import bodyParser = require('koa-bodyparser');
+import compress = require('koa-compress');
+import conditional = require('koa-conditional-get');
+import etag = require('koa-etag');
+import serveStatic = require('koa-static');
 
 const DEFAULT_OPTIONS = {
   helmetOptions: DEFAULT_HELMET_OPTIONS,
   observe: true,
-  omitMonitoringEndpoints: false,
   port: 80,
   serviceName: 'service',
 };
@@ -37,42 +30,14 @@ if (process.env.JEST_WORKER_ID === undefined) {
   collectDefaultMetrics();
 }
 
-const MONITORING_ENDPOINTS = ['/alive', '/metrics', '/ready'];
-
-const responseSummary = new Summary({
-  help: 'Response timing (seconds)',
-  labelNames: ['method', 'route', 'status'],
-  name: 'http_response',
-});
-
-export interface MonitorRequest {
-  duration: number;
-  method: string;
-  path: string;
-  status: number;
-}
-
-interface WithTracer {
-  tracer: Opentracing.Tracer;
-}
-
-export interface WithSpan {
-  span: Opentracing.Span;
-}
-
-type ServiceContext = RouterContext & WithLogger & WithTracer & WithSpan;
-
-export type Monitor = (details: MonitorRequest) => void;
-
 export interface ServiceOptions {
-  helmetOptions?: false | IHelmetConfiguration;
+  helmetOptions?: HelmetOptions;
   isAlive?: () => Promise<boolean>;
   isReady?: () => Promise<boolean>;
   logger?: Logger;
   loggerIgnorePath?: RegExp;
   monitor?: Monitor;
   observe?: boolean;
-  omitMonitoringEndpoints?: boolean;
   port: number | string; // server port
   serviceName?: string; // name of service, used for tracing
   staticPath?: string; // directory from which to serve static files
@@ -108,17 +73,18 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
     };
     this.logger = this.options.logger || logger;
 
-    koaOpentracing(this as any, {
+    koaOpentracing(this, {
       appname: this.options.serviceName || DEFAULT_OPTIONS.serviceName,
       carrier: {
         'http-header': {
-          extract(header: any) {
+          extract(header: { [key: string]: string }): koaOpentracing.spanContextCarrier {
             const traceId = String(header['x-request-id']).substr(0, 32);
             const spanId = String(header['x-request-id']).substr(32, 16);
             return { traceId, spanId };
           },
-          inject(spanContext: any): any {
-            return { 'x-request-id': spanContext.traceId + spanContext.spanId };
+          inject(spanContext: koaOpentracing.SpanContext): any {
+            const { traceId, spanId } = spanContext as unknown as { [key: string]: string };
+            return { 'x-request-id': traceId + spanId };
           },
         },
       },
@@ -126,13 +92,10 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
     });
 
     if (this.options.observe) {
-      this.use(ignorePaths(
-        MONITORING_ENDPOINTS,
-        this.observeMiddleware(),
-      ));
+      this.use(observeMiddleware(this.logger, this.options));
     }
     this.use(errorMiddleware());
-    if (this.options.helmetOptions !== false) {
+    if (this.options.helmetOptions) {
       this.use(helmet(this.options.helmetOptions));
     }
     this.use(conditional());
@@ -151,15 +114,8 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
   /**
    * Start the app
    */
-  public start(): Promise<void> {
-    if (this.server) throw new Error('Already started');
-
+  public start = (): Promise<void> => {
     const router = new Router();
-    if (!this.options.omitMonitoringEndpoints) {
-      router.get('/alive', livenessEndpoint(this.options.isAlive));
-      router.get('/metrics', prometheusMetricsEndpoint());
-      router.get('/ready', readinessEndpoint(this.options.isReady));
-    }
     this.mountApi(router);
 
     this.use(router.routes());
@@ -169,7 +125,7 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
     return this.startServer();
   }
 
-  public stop(): Promise<void> {
+  public shutdown = (): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       if (!this.server) return resolve();
 
@@ -183,71 +139,23 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
     });
   }
 
-  protected observeMiddleware(): Middleware {
-    const middleware = async (ctx: ServiceContext, next: () => Promise<any>): Promise<void> => {
-      const started = process.hrtime();
-
-      const spanContext = ctx.tracer.extract('http-header', ctx.request.headers) || undefined;
-      const span = ctx.span = ctx.tracer.startSpan(ctx.path, {
-        childOf: spanContext,
-        startTime: HrTime.toMs(started),
-      });
-      const { spanId, traceId } = span.context() as any;
-
-      ctx.logger = this.logger.child({
-        host: ctx.host,
-        ip: ctx.ip,
-        method: ctx.method,
-        path: ctx.request.url,
-        spanId,
-        traceId,
-      });
-
-      if (this.options.useLogger !== false && !this.options.loggerIgnorePath?.test(ctx.request.url)) {
-        ctx.logger('<--');
-      }
-      await next();
-
-      const duration = process.hrtime(started);
-      const durationMs = HrTime.toMs(duration);
-      span.finish(HrTime.toMs(started) + durationMs);
-      try {
-        responseSummary.observe({
-          method: ctx.method,
-          status: String(ctx.status),
-        }, HrTime.toSeconds(duration));
-
-        this.options.monitor && this.options.monitor({
-          duration: durationMs,
-          method: ctx.method,
-          path: ctx.path,
-          status: ctx.status,
-        });
-        if (this.options.useLogger !== false && !this.options.loggerIgnorePath?.test(ctx.request.url)) {
-          ctx.logger('-->', { duration: durationMs, status: ctx.status });
-        }
-      } catch (err) {
-        ctx.logger.error(err);
-      }
-    };
-    return middleware.bind(this) as Middleware;
+  public destroy = (): Promise<void> => {
+    return Promise.resolve();
   }
+
+  /**
+   * Start the web server
+   */
+  protected startServer = () => new Promise<void>((resolve, reject) => {
+    if (this.server) return reject(new Error('Already started'));
+    this.server = this.listen(this.options.port, () => {
+      this.logger(`HTTP started on http://localhost:${this.options.port}/`);
+      resolve();
+    });
+  })
 
   /**
    * Override to mount API routes
    */
   protected abstract mountApi(router: Router): void;
-
-  /**
-   * Start the web server
-   */
-  protected startServer(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.server) return reject(new Error('Already started'));
-      this.server = this.listen(this.options.port, () => {
-        this.logger(`HTTP started on http://localhost:${this.options.port}/`);
-        resolve();
-      });
-    });
-  }
 }
