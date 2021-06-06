@@ -56,7 +56,7 @@ export const graceful = (grace: Duration, prepare?: () => unknown | Promise<unkn
 export type ServiceFactory = (isReady: () => boolean) => Service;
 
 export class Graceful implements Service {
-  static service(grace: Duration, factory: ServiceFactory): Promise<unknown> {
+  public static service(grace: Duration, factory: ServiceFactory): Promise<unknown> {
     const service = new Graceful(grace, factory);
     return service.start();
   }
@@ -66,7 +66,7 @@ export class Graceful implements Service {
   private running = false;
 
   private constructor(grace: Duration, factory: ServiceFactory) {
-    this.service = factory(this.isReady);
+    this.service = factory(this.isReady.bind(this));
     graceful(
       grace,
       () => this.service.stop(),
@@ -74,21 +74,21 @@ export class Graceful implements Service {
     );
   }
 
-  isReady(): boolean {
+  public isReady(): boolean {
     return this.running;
   }
 
-  start(): Promise<unknown> {
+  public start(): Promise<unknown> {
     this.running = true;
     return this.service.start();
   }
 
-  stop(): Promise<unknown> {
+  public stop(): Promise<unknown> {
     this.running = false;
     return this.service.stop();
   }
 
-  dispose(): Promise<unknown> {
+  public dispose(): Promise<unknown> {
     return this.service.dispose();
   }
 }
