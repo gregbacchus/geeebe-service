@@ -90,7 +90,8 @@ export const livenessEndpoint = (isAlive?: () => Promise<boolean>) => async (ctx
   ctx.body = { alive };
   if (!alive) {
     ctx.status = Statuses.SERVICE_UNAVAILABLE;
-    ctx.response.headers['Retry-After'] = 30;
+    const headers = ctx.response.headers as Record<string, unknown>;
+    headers['Retry-After'] = 30;
   }
 };
 
@@ -104,12 +105,13 @@ export const readinessEndpoint = (isReady?: () => Promise<boolean>) => async (ct
   ctx.body = { ready };
   if (!ready) {
     ctx.status = Statuses.SERVICE_UNAVAILABLE;
-    ctx.response.headers['Retry-After'] = 30;
+    const headers = ctx.response.headers as Record<string, unknown>;
+    headers['Retry-After'] = 30;
   }
 };
 
 export const observeMiddleware = (logger: Logger, options: ObserveMiddlewareOptions): Middleware => {
-  const middleware = async (ctx: ServiceContext, next: () => Promise<any>): Promise<void> => {
+  const middleware = async (ctx: ServiceContext, next: () => Promise<unknown>): Promise<void> => {
     const started = process.hrtime();
 
     const spanContext = ctx.tracer.extract('http-header', ctx.request.headers) || undefined;
@@ -117,7 +119,7 @@ export const observeMiddleware = (logger: Logger, options: ObserveMiddlewareOpti
       childOf: spanContext,
       startTime: HrTime.toMs(started),
     });
-    const { spanId, traceId } = span.context() as any;
+    const { spanId, traceId } = span.context() as unknown as Record<string, string>;
 
     ctx.logger = logger.child({
       host: ctx.host,

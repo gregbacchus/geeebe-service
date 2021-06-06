@@ -7,4 +7,5 @@ import { register } from 'prom-client';
 export const prometheusMetricsEndpoint = () => async (ctx: RouterContext): Promise<void> => {
   ctx.type = register.contentType;
   ctx.body = register.metrics();
+  return Promise.resolve();
 };

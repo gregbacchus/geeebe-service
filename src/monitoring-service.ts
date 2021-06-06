@@ -16,7 +16,7 @@ export interface MonitorServiceOptions {
 }
 
 export class MonitorService<TOptions extends MonitorServiceOptions = MonitorServiceOptions> extends Koa implements Service {
-  public readonly logger: Logger;
+  readonly logger: Logger;
 
   private server: Server | undefined;
 
@@ -24,7 +24,7 @@ export class MonitorService<TOptions extends MonitorServiceOptions = MonitorServ
    * Create Koa app
    * @param options
    */
-  constructor(public readonly options: TOptions) {
+  constructor(readonly options: TOptions) {
     super();
 
     this.logger = this.options.logger || logger;
@@ -33,7 +33,7 @@ export class MonitorService<TOptions extends MonitorServiceOptions = MonitorServ
     this.on('error', onError(this.options.port, this.logger));
   }
 
-  public start(): Promise<void> {
+  start(): Promise<void> {
     if (this.server) throw new Error('Already started');
 
     const router = new Router();
@@ -54,11 +54,11 @@ export class MonitorService<TOptions extends MonitorServiceOptions = MonitorServ
     });
   }
 
-  public shutdown(): Promise<void> {
+  stop(): Promise<void> {
     return Promise.resolve();
   }
 
-  public destroy(): Promise<void> {
+  dispose(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       if (!this.server) return resolve();
 

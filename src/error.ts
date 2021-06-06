@@ -6,7 +6,6 @@ const debug = logger.child({});
 
 const EXIT_ERROR = 1;
 
-//noinspection JSUnusedGlobalSymbols
 /**
  * Formats the given error into the Koa context - Should never throw any exception
  * @param {object} ctx - koa.js context
@@ -64,11 +63,9 @@ export const onError = (port: number | string, log: Logger) => (error: any): voi
     case 'EACCES':
       console.error(`${bind} requires elevated privileges`);
       process.exit(EXIT_ERROR); // eslint-disable-line no-process-exit
-      break;
     case 'EADDRINUSE':
       console.error(`${bind} is already in use`);
       process.exit(EXIT_ERROR); // eslint-disable-line no-process-exit
-      break;
     default:
       throw error;
   }

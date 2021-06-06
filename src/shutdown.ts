@@ -4,13 +4,13 @@ import { Service } from './service';
 
 const log = logger.child({ module: 'service:shutdown' });
 
-function run(fn: (() => any | Promise<any>) | undefined, done: () => any): void {
+const run = (fn: (() => unknown | Promise<unknown>) | undefined, done: () => unknown): void => {
   if (!fn) {
     done();
     return;
   }
   Promise.all([fn()]).finally(done);
-}
+};
 
 /**
  * Enable graceful shutdown triggered by SIGINT or SIGTERM
@@ -18,7 +18,7 @@ function run(fn: (() => any | Promise<any>) | undefined, done: () => any): void 
  * @param prepare callback to start shutdown
  * @param finish callback to force shutdown after grace period has expired
  */
-export function graceful(grace: Duration, prepare?: () => any | Promise<any>, finish?: () => any | Promise<any>) {
+export const graceful = (grace: Duration, prepare?: () => unknown | Promise<unknown>, finish?: () => unknown | Promise<unknown>): { shuttingDown: boolean } => {
   const status = { shuttingDown: false };
 
   // signal handlers
@@ -51,12 +51,12 @@ export function graceful(grace: Duration, prepare?: () => any | Promise<any>, fi
   });
 
   return status;
-}
+};
 
 export type ServiceFactory = (isReady: () => boolean) => Service;
 
 export class Graceful implements Service {
-  public static service(grace: Duration, factory: ServiceFactory): Promise<void> {
+  static service(grace: Duration, factory: ServiceFactory): Promise<unknown> {
     const service = new Graceful(grace, factory);
     return service.start();
   }
@@ -69,22 +69,26 @@ export class Graceful implements Service {
     this.service = factory(this.isReady);
     graceful(
       grace,
-      () => this.service.shutdown(),
-      () => this.service.destroy(),
+      () => this.service.stop(),
+      () => this.service.dispose(),
     );
   }
 
-  public isReady = (): boolean => this.running;
+  isReady(): boolean {
+    return this.running;
+  }
 
-  public start = (): Promise<void> => {
+  start(): Promise<unknown> {
     this.running = true;
     return this.service.start();
   }
 
-  public shutdown = (): Promise<void> => {
+  stop(): Promise<unknown> {
     this.running = false;
-    return this.service.shutdown();
+    return this.service.stop();
   }
 
-  public destroy = (): Promise<void> => this.service.destroy();
+  dispose(): Promise<unknown> {
+    return this.service.dispose();
+  }
 }

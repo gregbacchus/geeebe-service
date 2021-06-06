@@ -3,6 +3,7 @@ import * as Router from '@koa/router';
 import Validator from 'better-validator';
 import { Koa2Middleware } from 'better-validator/src/middleware/Koa2Middleware';
 import * as Koa from 'koa';
+import { DefaultContext, DefaultState } from 'koa';
 import * as helmet from 'koa-helmet';
 import * as koaOpentracing from 'koa-opentracing';
 import { Server } from 'net';
@@ -52,11 +53,11 @@ export const validatorMiddleware: Koa2Middleware = Validator.koa2Middleware({
   responseFormatter: new WrapperFormatter({}),
 });
 
-//noinspection JSUnusedGlobalSymbols
-export abstract class KoaService<TOptions extends ServiceOptions = ServiceOptions> extends Koa implements Service {
-  public readonly options: TOptions;
+// noinspection JSUnusedGlobalSymbols
+export abstract class KoaService<TOptions extends ServiceOptions = ServiceOptions, StateT extends DefaultState = DefaultState, CustomT extends DefaultContext = DefaultContext> extends Koa<StateT, CustomT> implements Service {
+  readonly options: TOptions;
 
-  public readonly logger: Logger;
+  readonly logger: Logger;
 
   private server: Server | undefined;
 
@@ -73,7 +74,7 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
     };
     this.logger = this.options.logger || logger;
 
-    koaOpentracing(this, {
+    koaOpentracing(this as unknown as Koa, {
       appname: this.options.serviceName || DEFAULT_OPTIONS.serviceName,
       carrier: {
         'http-header': {
@@ -110,11 +111,10 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
     this.on('error', onError(this.options.port, this.logger));
   }
 
-  //noinspection JSUnusedGlobalSymbols
   /**
    * Start the app
    */
-  public start = (): Promise<void> => {
+  start(): Promise<void> {
     const router = new Router();
     this.mountApi(router);
 
@@ -125,7 +125,7 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
     return this.startServer();
   }
 
-  public shutdown = (): Promise<void> => {
+  stop(): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       if (!this.server) return resolve();
 
@@ -139,14 +139,14 @@ export abstract class KoaService<TOptions extends ServiceOptions = ServiceOption
     });
   }
 
-  public destroy = (): Promise<void> => {
+  dispose(): Promise<void> {
     return Promise.resolve();
   }
 
   /**
    * Start the web server
    */
-  protected startServer = () => new Promise<void>((resolve, reject) => {
+  private startServer = (): Promise<void> => new Promise<void>((resolve, reject) => {
     if (this.server) return reject(new Error('Already started'));
     this.server = this.listen(this.options.port, () => {
       this.logger(`HTTP started on http://localhost:${this.options.port}/`);
