@@ -15,7 +15,7 @@ jobs:
           node-version: 14
           registry-url: https://registry.npmjs.org/
       - run: npm ci -s
-      - run: npm run test --passWithNoTests -s
+      - run: npm run test -s
       - name: Commit report
         run: |
           git config --global user.name 'CI Bot'
