@@ -2,26 +2,26 @@
   "name": "@geeebe/service",
   "version": "2.0.2",
   "description": "Service pattern with graceful shutdown",
-  "main": "./dist/index.js",
   "repository": {
     "type": "git",
     "url": "git@github.com:gregbacchus/geeebe-service.git"
   },
-  "scripts": {
-    "lint": "./node_modules/.bin/eslint src/ --ext .ts,.tsx",
-    "test": "./node_modules/.bin/jest --verbose --coverage --runInBand --passWithNoTests",
-    "build": "rm -rf dist && ./node_modules/.bin/tsc --outDir dist --sourceMap",
-    "prepublishOnly": "npm run build && npm version patch",
-    "postpublish": "git push"
-  },
-  "author": "",
   "license": "ISC",
+  "author": "",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "rm -rf dist && ./node_modules/.bin/tsc --outDir dist --sourceMap",
+    "lint": "./node_modules/.bin/eslint src/ --ext .ts,.tsx",
+    "prepublishOnly": "npm run build && npm version patch",
+    "postpublish": "git push",
+    "test": "./node_modules/.bin/jest --verbose --coverage --runInBand --passWithNoTests"
+  },
   "dependencies": {
     "@geeebe/common": "^1.0.76",
     "@geeebe/logging": "^1.0.26",
     "reflect-metadata": "^0.1.13"
   },
-  "types": "./src/index.ts",
   "devDependencies": {
     "@types/jest": "^26.0.23",
     "@types/node": "^15.12.1",
