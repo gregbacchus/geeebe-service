@@ -1,6 +1,6 @@
 {
   "name": "@geeebe/service",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Service pattern with graceful shutdown",
   "main": "./dist/index.js",
   "repository": {
