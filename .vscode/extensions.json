@@ -1,10 +1,18 @@
 {
   "recommendations": [
-    "steoates.autoimport",
-    "editorconfig.editorconfig",
+    "aaron-bond.better-comments",
+    "britesnow.vscode-toggle-quotes",
     "christian-kohler.path-intellisense",
-    "ms-vscode.vscode-typescript-tslint-plugin",
-    "waderyan.gitblame",
-    "codezombiech.gitignore"
+    "codezombiech.gitignore",
+    "coenraads.bracket-pair-colorizer",
+    "dbaeumer.vscode-eslint",
+    "editorconfig.editorconfig",
+    "gruntfuggly.todo-tree",
+    "joaompinto.asciidoctor-vscode",
+    "mikestead.dotenv",
+    "steoates.autoimport",
+    "stepsize.tech-debt-tracker",
+    "streetsidesoftware.code-spell-checker",
+    "waderyan.gitblame"
   ]
 }
