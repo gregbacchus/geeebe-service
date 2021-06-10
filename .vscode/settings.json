@@ -1,19 +1,7 @@
 {
-  "eslint.enable": false,
+  "eslint.enable": true,
   "editor.formatOnSave": true,
   "tslint.autoFixOnSave": true,
   "files.trimTrailingWhitespace": true,
-  "files.insertFinalNewline": true,
-  "cSpell.words": [
-    "Opentracing",
-    "Prefetch",
-    "appname",
-    "bodyparser",
-    "cacheable",
-    "etag",
-    "frameguard",
-    "geeebe",
-    "hpkp",
-    "nosniff"
-  ]
+  "files.insertFinalNewline": true
 }
