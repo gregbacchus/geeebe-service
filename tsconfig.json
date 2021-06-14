@@ -4,11 +4,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "inlineSources": true,
-    "lib": [
-      "es2018",
-      "esnext.asynciterable",
-      "DOM"
-    ],
+    "lib": [],
     "module": "commonjs",
     "moduleResolution": "node",
     "noUnusedLocals": true,
