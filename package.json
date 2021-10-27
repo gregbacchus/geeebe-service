@@ -1,6 +1,6 @@
 {
   "name": "@geeebe/service",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "description": "Service pattern with graceful shutdown",
   "repository": {
     "type": "git",
