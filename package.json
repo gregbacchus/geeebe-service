@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@geeebe/common": "^1.0.79",
-    "@geeebe/logging": "^1.0.26",
+    "@geeebe/logging": "^1.0.27",
     "reflect-metadata": "^0.1.13"
   },
   "devDependencies": {
